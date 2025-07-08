@@ -39,7 +39,13 @@ class PitchShifterApp {
 
   private async handlePitchShift(audioBuffer: AudioBuffer, semitones: number) {
     try {
-      const processedBuffer = await this.pitchShifter.shiftPitch(audioBuffer, semitones);
+      const processedBuffer = await this.pitchShifter.shiftPitch(
+        audioBuffer, 
+        semitones,
+        (progress: number) => {
+          this.uiController.updateProgress(progress);
+        }
+      );
       this.uiController.setProcessedAudio(processedBuffer);
       this.uiController.enableExport(this.handleExport.bind(this));
     } catch (error) {

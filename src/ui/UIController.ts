@@ -199,7 +199,7 @@ export class UIController {
     this.exportBtn.disabled = false;
   }
 
-  setStatus(message: string, type: 'info' | 'success' | 'error' = 'info') {
+  setStatus(message: string, type: 'info' | 'success' | 'error' | 'processing' = 'info') {
     this.status.textContent = message;
     this.status.className = `status ${type}`;
   }
@@ -225,6 +225,11 @@ export class UIController {
   private showProgress() {
     this.progressBar.classList.add('visible');
     this.progressFill.classList.add('indeterminate');
+  }
+
+  updateProgress(progress: number) {
+    this.progressFill.classList.remove('indeterminate');
+    this.progressFill.style.width = `${progress}%`;
   }
 
   private hideProgress() {

@@ -16,5 +16,16 @@ declare module '@echogarden/rubberband-wasm' {
     };
   }
 
+  export interface RubberBandModule {
+    cwrap(funcName: string, returnType: string, argTypes: string[]): Function;
+    _malloc(size: number): number;
+    _free(ptr: number): void;
+    HEAPF32: Float32Array;
+    HEAPU32: Uint32Array;
+  }
+
   export function createRubberBandStretcher(): Promise<RubberBandStretcher>;
+  
+  const RubberBandModuleFactory: (options?: any) => Promise<RubberBandModule>;
+  export default RubberBandModuleFactory;
 }
