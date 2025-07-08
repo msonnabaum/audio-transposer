@@ -1,0 +1,21 @@
+{
+  "name": "pitch-shifter-web",
+  "version": "1.0.0",
+  "description": "Web-based audio pitch shifter using WebAssembly",
+  "main": "dist/index.html",
+  "scripts": {
+    "dev": "node build.js --dev",
+    "build": "node build.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@echogarden/rubberband-wasm": "^0.2.0",
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.53.2",
+    "esbuild": "^0.19.12",
+    "typescript": "^5.3.3"
+  }
+}
