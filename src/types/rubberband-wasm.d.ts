@@ -1,4 +1,4 @@
-declare module '@echogarden/rubberband-wasm' {
+declare module "@echogarden/rubberband-wasm" {
   export interface RubberBandStretcherOptions {
     pitchScale?: number;
     timeRatio?: number;
@@ -12,7 +12,10 @@ declare module '@echogarden/rubberband-wasm' {
       channels: number,
       options?: RubberBandStretcherOptions
     ): {
-      process(inputChannels: Float32Array[], isLastChunk: boolean): Float32Array[];
+      process(
+        inputChannels: Float32Array[],
+        isLastChunk: boolean
+      ): Float32Array[];
     };
   }
 
@@ -25,7 +28,8 @@ declare module '@echogarden/rubberband-wasm' {
   }
 
   export function createRubberBandStretcher(): Promise<RubberBandStretcher>;
-  
+
   const RubberBandModuleFactory: (options?: any) => Promise<RubberBandModule>;
   export default RubberBandModuleFactory;
 }
+

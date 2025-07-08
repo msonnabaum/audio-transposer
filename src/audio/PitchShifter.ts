@@ -1,10 +1,10 @@
 interface WorkerMessage {
-  type: 'init' | 'process';
+  type: "init" | "process";
   data?: any;
 }
 
 interface WorkerResponse {
-  type: 'ready' | 'progress' | 'complete' | 'error';
+  type: "ready" | "progress" | "complete" | "error";
   data?: any;
 }
 
@@ -18,13 +18,16 @@ export class PitchShifter {
 
     try {
       console.log("Initializing pitch shifter worker...");
-      
-      this.worker = new Worker(new URL('./pitch-shifter.worker.ts', import.meta.url), {
-        type: 'module'
-      });
+
+      this.worker = new Worker(
+        new URL("./pitch-shifter.worker.ts", import.meta.url),
+        {
+          type: "module",
+        }
+      );
 
       this.worker.onerror = (error) => {
-        console.error('Worker error:', error);
+        console.error("Worker error:", error);
       };
 
       await this.initWorker();
@@ -43,28 +46,28 @@ export class PitchShifter {
   private async initWorker(): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.worker) {
-        reject(new Error('Worker not created'));
+        reject(new Error("Worker not created"));
         return;
       }
 
       const timeout = setTimeout(() => {
-        reject(new Error('Worker initialization timeout'));
+        reject(new Error("Worker initialization timeout"));
       }, 10000);
 
       this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
         const { type, data } = event.data;
-        
-        if (type === 'ready') {
+
+        if (type === "ready") {
           clearTimeout(timeout);
           this.workerReady = true;
           resolve();
-        } else if (type === 'error') {
+        } else if (type === "error") {
           clearTimeout(timeout);
           reject(new Error(data));
         }
       };
 
-      this.worker.postMessage({ type: 'init' } as WorkerMessage);
+      this.worker.postMessage({ type: "init" } as WorkerMessage);
     });
   }
 
@@ -103,12 +106,15 @@ export class PitchShifter {
         audioData.push(audioBuffer.getChannelData(i));
       }
 
-      const outputChannels = await this.processInWorker({
-        audioData,
-        sampleRate,
-        channels,
-        semitones
-      }, onProgress);
+      const outputChannels = await this.processInWorker(
+        {
+          audioData,
+          sampleRate,
+          channels,
+          semitones,
+        },
+        onProgress
+      );
 
       const outputLength = outputChannels[0].length;
       const outputBuffer = new AudioContext().createBuffer(
@@ -144,28 +150,28 @@ export class PitchShifter {
   ): Promise<Float32Array[]> {
     return new Promise((resolve, reject) => {
       if (!this.worker) {
-        reject(new Error('Worker not available'));
+        reject(new Error("Worker not available"));
         return;
       }
 
       const timeout = setTimeout(() => {
-        reject(new Error('Worker processing timeout'));
+        reject(new Error("Worker processing timeout"));
       }, 30000);
 
       this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
         const { type, data: responseData } = event.data;
 
         switch (type) {
-          case 'progress':
+          case "progress":
             if (onProgress) {
               onProgress(responseData.progress);
             }
             break;
-          case 'complete':
+          case "complete":
             clearTimeout(timeout);
             resolve(responseData.outputChannels);
             break;
-          case 'error':
+          case "error":
             clearTimeout(timeout);
             reject(new Error(responseData));
             break;
@@ -173,8 +179,8 @@ export class PitchShifter {
       };
 
       this.worker.postMessage({
-        type: 'process',
-        data
+        type: "process",
+        data,
       } as WorkerMessage);
     });
   }
@@ -200,4 +206,3 @@ export class PitchShifter {
     return this.initialized;
   }
 }
-
