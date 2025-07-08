@@ -69,7 +69,9 @@ class PitchShifterWorker {
         rubberband_retrieve: this.module.cwrap("rubberband_retrieve", "number", ["number", "number", "number"]),
         rubberband_get_samples_required: this.module.cwrap("rubberband_get_samples_required", "number", ["number"]),
         rubberband_set_max_process_size: this.module.cwrap("rubberband_set_max_process_size", "void", ["number", "number"]),
-        rubberband_get_latency: this.module.cwrap("rubberband_get_latency", "number", ["number"])
+        rubberband_get_latency: this.module.cwrap("rubberband_get_latency", "number", ["number"]),
+        rubberband_study: this.module.cwrap("rubberband_study", "void", ["number", "number", "number", "number"]),
+        rubberband_set_expected_input_duration: this.module.cwrap("rubberband_set_expected_input_duration", "void", ["number", "number"])
       };
 
       this.initialized = true;
@@ -113,17 +115,19 @@ class PitchShifterWorker {
     }
 
     try {
-      const maxProcessSize = 4096;
-      this.wrappedFunctions.rubberband_set_max_process_size(stretcher, maxProcessSize);
       this.wrappedFunctions.rubberband_set_time_ratio(stretcher, timeRatio);
       this.wrappedFunctions.rubberband_set_pitch_scale(stretcher, pitchRatio);
+      this.wrappedFunctions.rubberband_set_expected_input_duration(stretcher, inputLength);
 
-      const outputChannels = await this.processAudioChunks(
+      const samplesRequired = this.wrappedFunctions.rubberband_get_samples_required(stretcher);
+      this.wrappedFunctions.rubberband_set_max_process_size(stretcher, samplesRequired);
+
+      const outputChannels = await this.processAudioWithStudy(
         stretcher,
         audioData,
         inputLength,
         channels,
-        maxProcessSize
+        samplesRequired
       );
 
       this.postMessage({
@@ -135,71 +139,69 @@ class PitchShifterWorker {
     }
   }
 
-  private async processAudioChunks(
+  private async processAudioWithStudy(
     stretcher: number,
     inputChannels: Float32Array[],
     inputLength: number,
     channels: number,
-    maxProcessSize: number
+    samplesRequired: number
   ): Promise<Float32Array[]> {
     const outputChunks: Float32Array[][] = [];
     const inputPtrs = this.module._malloc(channels * 4);
     const outputPtrs = this.module._malloc(channels * 4);
 
+    const channelDataPtrs: number[] = [];
+    for (let ch = 0; ch < channels; ch++) {
+      const bufferPtr = this.module._malloc(samplesRequired * 4);
+      channelDataPtrs.push(bufferPtr);
+      this.module.HEAPU32[(inputPtrs >> 2) + ch] = bufferPtr;
+    }
+
     try {
-      for (let offset = 0; offset < inputLength; offset += maxProcessSize) {
-        const chunkSize = Math.min(maxProcessSize, inputLength - offset);
-        const isLastChunk = offset + chunkSize >= inputLength;
-        
-        const progress = (offset / inputLength) * 100;
+      let read = 0;
+
+      while (read < inputLength) {
+        const chunkSize = Math.min(samplesRequired, inputLength - read);
+        const isFinal = read + chunkSize >= inputLength;
+
+        for (let ch = 0; ch < channels; ch++) {
+          const inputData = inputChannels[ch].subarray(read, read + chunkSize);
+          this.module.HEAPF32.set(inputData, channelDataPtrs[ch] >> 2);
+        }
+
+        this.wrappedFunctions.rubberband_study(stretcher, inputPtrs, chunkSize, isFinal ? 1 : 0);
+        read += chunkSize;
+
+        const progress = (read / inputLength) * 50;
         this.postMessage({
           type: 'progress',
           data: { progress }
         });
-
-        const inputBuffers: number[] = [];
-        const outputBuffers: number[] = [];
-
-        try {
-          for (let ch = 0; ch < channels; ch++) {
-            const inputBuffer = this.module._malloc(chunkSize * 4);
-            inputBuffers.push(inputBuffer);
-
-            const inputData = inputChannels[ch].subarray(offset, offset + chunkSize);
-            this.module.HEAPF32.set(inputData, inputBuffer >> 2);
-            this.module.HEAPU32[(inputPtrs >> 2) + ch] = inputBuffer;
-          }
-
-          this.wrappedFunctions.rubberband_process(stretcher, inputPtrs, chunkSize, isLastChunk ? 1 : 0);
-
-          const available = this.wrappedFunctions.rubberband_available(stretcher);
-          if (available > 0) {
-            for (let ch = 0; ch < channels; ch++) {
-              const outputBuffer = this.module._malloc(available * 4);
-              outputBuffers.push(outputBuffer);
-              this.module.HEAPU32[(outputPtrs >> 2) + ch] = outputBuffer;
-            }
-
-            const retrieved = this.wrappedFunctions.rubberband_retrieve(stretcher, outputPtrs, available);
-
-            const outputChunk: Float32Array[] = [];
-            for (let ch = 0; ch < channels; ch++) {
-              const outputData = new Float32Array(retrieved);
-              outputData.set(
-                this.module.HEAPF32.subarray(
-                  outputBuffers[ch] >> 2,
-                  (outputBuffers[ch] >> 2) + retrieved
-                )
-              );
-              outputChunk.push(outputData);
-            }
-            outputChunks.push(outputChunk);
-          }
-        } finally {
-          inputBuffers.forEach(buffer => this.module._free(buffer));
-          outputBuffers.forEach(buffer => this.module._free(buffer));
-        }
       }
+
+      read = 0;
+      while (read < inputLength) {
+        const chunkSize = Math.min(samplesRequired, inputLength - read);
+        const isFinal = read + chunkSize >= inputLength;
+
+        for (let ch = 0; ch < channels; ch++) {
+          const inputData = inputChannels[ch].subarray(read, read + chunkSize);
+          this.module.HEAPF32.set(inputData, channelDataPtrs[ch] >> 2);
+        }
+
+        this.wrappedFunctions.rubberband_process(stretcher, inputPtrs, chunkSize, isFinal ? 1 : 0);
+        this.tryRetrieveOutput(stretcher, outputPtrs, outputChunks, channels, samplesRequired, false);
+
+        read += chunkSize;
+
+        const progress = 50 + (read / inputLength) * 50;
+        this.postMessage({
+          type: 'progress',
+          data: { progress }
+        });
+      }
+
+      this.tryRetrieveOutput(stretcher, outputPtrs, outputChunks, channels, samplesRequired, true);
 
       const totalLength = outputChunks.reduce((sum, chunk) => sum + chunk[0].length, 0);
       const outputChannels: Float32Array[] = [];
@@ -218,8 +220,56 @@ class PitchShifterWorker {
 
       return outputChannels;
     } finally {
+      channelDataPtrs.forEach(ptr => this.module._free(ptr));
       this.module._free(inputPtrs);
       this.module._free(outputPtrs);
+    }
+  }
+
+  private tryRetrieveOutput(
+    stretcher: number,
+    outputPtrs: number,
+    outputChunks: Float32Array[][],
+    channels: number,
+    samplesRequired: number,
+    final: boolean
+  ) {
+    while (true) {
+      const available = this.wrappedFunctions.rubberband_available(stretcher);
+      if (available < 1) break;
+      if (!final && available < samplesRequired) break;
+
+      const outputBuffers: number[] = [];
+      try {
+        for (let ch = 0; ch < channels; ch++) {
+          const outputBuffer = this.module._malloc(available * 4);
+          outputBuffers.push(outputBuffer);
+          this.module.HEAPU32[(outputPtrs >> 2) + ch] = outputBuffer;
+        }
+
+        const retrieved = this.wrappedFunctions.rubberband_retrieve(
+          stretcher,
+          outputPtrs,
+          Math.min(samplesRequired, available)
+        );
+
+        if (retrieved > 0) {
+          const outputChunk: Float32Array[] = [];
+          for (let ch = 0; ch < channels; ch++) {
+            const outputData = new Float32Array(retrieved);
+            outputData.set(
+              this.module.HEAPF32.subarray(
+                outputBuffers[ch] >> 2,
+                (outputBuffers[ch] >> 2) + retrieved
+              )
+            );
+            outputChunk.push(outputData);
+          }
+          outputChunks.push(outputChunk);
+        }
+      } finally {
+        outputBuffers.forEach(buffer => this.module._free(buffer));
+      }
     }
   }
 
