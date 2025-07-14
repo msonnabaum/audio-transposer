@@ -62,6 +62,302 @@ const wasmEmbedPlugin = {
   },
 };
 
+// Plugin to embed FFmpeg core files for @ffmpeg/ffmpeg
+const ffmpegEmbedPlugin = {
+  name: "ffmpeg-embed",
+  setup(build) {
+    // Handle @ffmpeg/ffmpeg module imports - provide a custom FFmpeg class with embedded worker
+    build.onResolve({ filter: /^@ffmpeg\/ffmpeg$/ }, (args) => {
+      return { path: args.path, namespace: "ffmpeg-embed" };
+    });
+
+    build.onLoad({ filter: /.*/, namespace: "ffmpeg-embed" }, () => {
+      const ffmpegJsPath = path.join(
+        __dirname,
+        "node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.js"
+      );
+      const ffmpegWasmPath = path.join(
+        __dirname,
+        "node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.wasm"
+      );
+
+      const ffmpegJs = fs.readFileSync(ffmpegJsPath, "utf8");
+      const ffmpegWasm = fs.readFileSync(ffmpegWasmPath);
+      const wasmBase64 = ffmpegWasm.toString("base64");
+
+      const coreJsBase64 = Buffer.from(ffmpegJs).toString("base64");
+
+      return {
+        contents: `
+          // Embedded FFmpeg with core and worker
+          const wasmBase64 = "${wasmBase64}";
+          const coreJsBase64 = "${coreJsBase64}";
+
+          // Create embedded worker code that works with the core
+          const createEmbeddedWorkerCode = () => {
+            return \`
+              // Constants for FFmpeg message types
+              const FFMessageType = {
+                LOAD: "LOAD",
+                EXEC: "EXEC",
+                FFPROBE: "FFPROBE", 
+                WRITE_FILE: "WRITE_FILE",
+                READ_FILE: "READ_FILE",
+                DELETE_FILE: "DELETE_FILE",
+                RENAME: "RENAME",
+                CREATE_DIR: "CREATE_DIR",
+                LIST_DIR: "LIST_DIR",
+                DELETE_DIR: "DELETE_DIR",
+                ERROR: "ERROR",
+                DOWNLOAD: "DOWNLOAD",
+                PROGRESS: "PROGRESS",
+                LOG: "LOG",
+                MOUNT: "MOUNT",
+                UNMOUNT: "UNMOUNT"
+              };
+
+              const ERROR_UNKNOWN_MESSAGE_TYPE = "unknown message type";
+              const ERROR_NOT_LOADED = "ffmpeg is not loaded";
+              const ERROR_IMPORT_FAILURE = "failed to import ffmpeg-core.js";
+
+              let ffmpeg;
+
+              const load = async ({ coreURL, wasmURL, workerURL }) => {
+                const first = !ffmpeg;
+                try {
+                  // Decode and execute the core module using eval in worker context
+                  const coreJs = atob("${coreJsBase64}");
+                  
+                  // Create a module object for the core to populate
+                  const module = { exports: {} };
+                  
+                  // Execute the core JavaScript with proper module context
+                  const wrappedCode = '(function(module, exports) {' + coreJs + '})(module, module.exports);';
+                  
+                  eval(wrappedCode);
+                  
+                  // The core should have set module.exports to the createFFmpegCore function
+                  self.createFFmpegCore = module.exports;
+                  
+                  if (!self.createFFmpegCore || typeof self.createFFmpegCore !== 'function') {
+                    throw new Error(ERROR_IMPORT_FAILURE);
+                  }
+                } catch (error) {
+                  console.error('Failed to create core:', error);
+                  throw error;
+                }
+
+                // Create ffmpeg instance with embedded WASM
+                ffmpeg = await self.createFFmpegCore({
+                  wasmBinary: Uint8Array.from(atob("${wasmBase64}"), c => c.charCodeAt(0)),
+                  locateFile: (path) => {
+                    if (path.endsWith('.wasm')) {
+                      return 'data:application/wasm;base64,' + "${wasmBase64}";
+                    }
+                    return path;
+                  }
+                });
+
+                ffmpeg.setLogger((data) => self.postMessage({ type: FFMessageType.LOG, data }));
+                ffmpeg.setProgress((data) => self.postMessage({ type: FFMessageType.PROGRESS, data }));
+                return first;
+              };
+
+              const exec = ({ args, timeout = -1 }) => {
+                ffmpeg.setTimeout(timeout);
+                ffmpeg.exec(...args);
+                const ret = ffmpeg.ret;
+                ffmpeg.reset();
+                return ret;
+              };
+
+              const writeFile = ({ path, data }) => {
+                ffmpeg.FS.writeFile(path, data);
+                return true;
+              };
+
+              const readFile = ({ path, encoding }) => ffmpeg.FS.readFile(path, { encoding });
+
+              const deleteFile = ({ path }) => {
+                ffmpeg.FS.unlink(path);
+                return true;
+              };
+
+              self.onmessage = async ({ data: { id, type, data: _data } }) => {
+                const trans = [];
+                let data;
+                try {
+                  if (type !== FFMessageType.LOAD && !ffmpeg) {
+                    throw new Error(ERROR_NOT_LOADED);
+                  }
+                  switch (type) {
+                    case FFMessageType.LOAD:
+                      data = await load(_data);
+                      break;
+                    case FFMessageType.EXEC:
+                      data = exec(_data);
+                      break;
+                    case FFMessageType.WRITE_FILE:
+                      data = writeFile(_data);
+                      break;
+                    case FFMessageType.READ_FILE:
+                      data = readFile(_data);
+                      break;
+                    case FFMessageType.DELETE_FILE:
+                      data = deleteFile(_data);
+                      break;
+                    default:
+                      throw new Error(ERROR_UNKNOWN_MESSAGE_TYPE);
+                  }
+                } catch (e) {
+                  self.postMessage({
+                    id,
+                    type: FFMessageType.ERROR,
+                    data: e.toString(),
+                  });
+                  return;
+                }
+                if (data instanceof Uint8Array) {
+                  trans.push(data.buffer);
+                }
+                self.postMessage({ id, type, data }, trans);
+              };
+            \`;
+          };
+
+          // Custom FFmpeg class that uses embedded worker
+          class FFmpeg {
+            #worker = null;
+            #resolves = {};
+            #rejects = {};
+            #logEventCallbacks = [];
+            #progressEventCallbacks = [];
+            loaded = false;
+
+            #registerHandlers = () => {
+              if (this.#worker) {
+                this.#worker.onmessage = ({ data: { id, type, data } }) => {
+                  const FFMessageType = {
+                    LOAD: "LOAD",
+                    EXEC: "EXEC",
+                    WRITE_FILE: "WRITE_FILE",
+                    READ_FILE: "READ_FILE",
+                    DELETE_FILE: "DELETE_FILE",
+                    ERROR: "ERROR",
+                    LOG: "LOG",
+                    PROGRESS: "PROGRESS"
+                  };
+                  
+                  switch (type) {
+                    case FFMessageType.LOAD:
+                      this.loaded = true;
+                      this.#resolves[id](data);
+                      break;
+                    case FFMessageType.EXEC:
+                    case FFMessageType.WRITE_FILE:
+                    case FFMessageType.READ_FILE:
+                    case FFMessageType.DELETE_FILE:
+                      this.#resolves[id](data);
+                      break;
+                    case FFMessageType.LOG:
+                      this.#logEventCallbacks.forEach((f) => f(data));
+                      break;
+                    case FFMessageType.PROGRESS:
+                      this.#progressEventCallbacks.forEach((f) => f(data));
+                      break;
+                    case FFMessageType.ERROR:
+                      this.#rejects[id](data);
+                      break;
+                  }
+                  delete this.#resolves[id];
+                  delete this.#rejects[id];
+                };
+              }
+            };
+
+            #send = ({ type, data }, trans = [], signal) => {
+              if (!this.#worker) {
+                return Promise.reject(new Error("ffmpeg is not loaded"));
+              }
+              return new Promise((resolve, reject) => {
+                const id = Date.now() + Math.random();
+                this.#worker.postMessage({ id, type, data }, trans);
+                this.#resolves[id] = resolve;
+                this.#rejects[id] = reject;
+                signal?.addEventListener("abort", () => {
+                  reject(new DOMException(\`Message # \${id} was aborted\`, "AbortError"));
+                }, { once: true });
+              });
+            };
+
+            on(event, callback) {
+              if (event === "log") {
+                this.#logEventCallbacks.push(callback);
+              } else if (event === "progress") {
+                this.#progressEventCallbacks.push(callback);
+              }
+            }
+
+            load = (config = {}, { signal } = {}) => {
+              if (!this.#worker) {
+                const workerCode = createEmbeddedWorkerCode();
+                const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+                const workerUrl = URL.createObjectURL(workerBlob);
+                this.#worker = new Worker(workerUrl);
+                this.#registerHandlers();
+              }
+              
+              return this.#send({
+                type: "LOAD",
+                data: config,
+              }, undefined, signal);
+            };
+
+            exec = (args, timeout = -1, { signal } = {}) => this.#send({
+              type: "EXEC",
+              data: { args, timeout },
+            }, undefined, signal);
+
+            writeFile = (path, data, { signal } = {}) => {
+              const trans = [];
+              if (data instanceof Uint8Array) {
+                trans.push(data.buffer);
+              }
+              return this.#send({
+                type: "WRITE_FILE",
+                data: { path, data },
+              }, trans, signal);
+            };
+
+            readFile = (path, encoding = "binary", { signal } = {}) => this.#send({
+              type: "READ_FILE",
+              data: { path, encoding },
+            }, undefined, signal);
+
+            terminate = () => {
+              const ids = Object.keys(this.#rejects);
+              for (const id of ids) {
+                this.#rejects[id](new Error("terminated"));
+                delete this.#rejects[id];
+                delete this.#resolves[id];
+              }
+              if (this.#worker) {
+                this.#worker.terminate();
+                this.#worker = null;
+                this.loaded = false;
+              }
+            };
+          }
+
+          // Export the embedded FFmpeg class
+          export { FFmpeg };
+        `,
+        loader: "js",
+      };
+    });
+  },
+};
+
 async function build() {
   try {
     // Ensure dist directory exists
@@ -87,6 +383,7 @@ async function build() {
       external: [],
       plugins: [
         wasmEmbedPlugin,
+        ffmpegEmbedPlugin,
         // Plugin to handle Node.js modules
         {
           name: "node-modules",
@@ -128,6 +425,7 @@ async function build() {
       external: [],
       plugins: [
         wasmEmbedPlugin,
+        ffmpegEmbedPlugin,
         // Plugin to handle Node.js modules
         {
           name: "node-modules",

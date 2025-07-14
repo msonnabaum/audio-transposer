@@ -7,12 +7,15 @@
     "dev": "node build.js --dev",
     "build": "node build.js",
     "typecheck": "tsc --noEmit",
+    "pretest": "npm run build",
     "test": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "dependencies": {
     "@echogarden/rubberband-wasm": "^0.2.0",
+    "@ffmpeg/core": "^0.12.9",
+    "@ffmpeg/core-mt": "^0.12.9",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1"
   },
