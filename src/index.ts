@@ -83,4 +83,3 @@ document.addEventListener("DOMContentLoaded", async () => {
   const app = new PitchShifterApp();
   await app.init();
 });
-

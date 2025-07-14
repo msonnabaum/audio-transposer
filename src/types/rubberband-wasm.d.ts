@@ -32,4 +32,3 @@ declare module "@echogarden/rubberband-wasm" {
   const RubberBandModuleFactory: (options?: any) => Promise<RubberBandModule>;
   export default RubberBandModuleFactory;
 }
-

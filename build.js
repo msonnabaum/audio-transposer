@@ -34,17 +34,17 @@ const wasmEmbedPlugin = {
           // Embedded WASM data as base64
           const wasmBase64 = "${wasmBase64}";
           const wasmBinary = Uint8Array.from(atob(wasmBase64), c => c.charCodeAt(0));
-          
+
           // Load the rubberband.js code and modify its exports
           ${jsCode.replace(
             "export default Rubberband;",
             "// export default Rubberband;"
           )}
-          
+
           // Override the default export to use our embedded WASM
           export default function(moduleArg = {}) {
             moduleArg.wasmBinary = wasmBinary;
-            
+
             // Prevent the module from trying to load WASM from URL
             moduleArg.locateFile = (path) => {
               if (path.endsWith('.wasm')) {
@@ -52,7 +52,7 @@ const wasmEmbedPlugin = {
               }
               return path;
             };
-            
+
             return Rubberband(moduleArg);
           }
         `,
@@ -198,25 +198,25 @@ async function build() {
 <body>
     <div class="container">
         <h1>🎵 Pitch Shifter</h1>
-        
+
         <div class="drop-zone" id="dropZone">
             <p>Drop your audio file here</p>
             <small>Supports MP3, M4A, and WAV files</small>
             <input type="file" id="fileInput" accept=".mp3,.m4a,.wav" style="display: none;">
         </div>
-        
+
         <div class="controls" id="controls">
             <div class="slider-container">
                 <label for="pitchSlider">Pitch Shift (semitones):</label>
                 <div class="slider-value" id="sliderValue">0</div>
                 <input type="range" id="pitchSlider" class="slider" min="-12" max="12" value="0" step="1">
             </div>
-            
+
             <div class="button-group">
                 <button class="btn btn-primary" id="previewBtn" disabled>Preview</button>
                 <button class="btn btn-secondary" id="exportBtn" disabled>Export M4A</button>
             </div>
-            
+
             <div class="audio-player" id="audioPlayer">
                 <div>Original:</div>
                 <audio id="originalAudio" controls style="display: none;"></audio>
@@ -224,9 +224,9 @@ async function build() {
                 <audio id="processedAudio" controls style="display: none;"></audio>
             </div>
         </div>
-        
+
         <div class="status" id="status">Ready to load audio file</div>
-        
+
         <div class="progress-bar" id="progressBar">
             <div class="progress-fill" id="progressFill"></div>
         </div>
@@ -237,7 +237,7 @@ async function build() {
         const workerCode = ${JSON.stringify(workerContent)};
         const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
         const workerUrl = URL.createObjectURL(workerBlob);
-        
+
         // Override the Worker constructor to use our embedded worker
         const originalWorker = globalThis.Worker;
         globalThis.Worker = class extends originalWorker {
@@ -249,7 +249,7 @@ async function build() {
             }
           }
         };
-        
+
         ${jsContent}
     </script>
 </body>
@@ -338,4 +338,3 @@ function getCSSContent() {
 }
 
 build();
-

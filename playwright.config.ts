@@ -19,4 +19,3 @@ export default defineConfig({
   ],
   webServer: undefined, // We'll use file:// protocol
 });
-

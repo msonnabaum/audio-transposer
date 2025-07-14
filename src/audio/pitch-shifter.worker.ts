@@ -367,4 +367,3 @@ class PitchShifterWorker {
 }
 
 new PitchShifterWorker();
-

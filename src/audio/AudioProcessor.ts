@@ -12,9 +12,8 @@ export class AudioProcessor {
 
       // Try Web Audio API first (works for WAV and MP3)
       try {
-        const audioBuffer = await this.audioContext.decodeAudioData(
-          arrayBuffer
-        );
+        const audioBuffer =
+          await this.audioContext.decodeAudioData(arrayBuffer);
         console.log("Successfully decoded with Web Audio API");
         return audioBuffer;
       } catch (webAudioError) {
@@ -73,9 +72,8 @@ export class AudioProcessor {
       const wavArrayBuffer = (outputData as Uint8Array).buffer;
 
       // Decode the WAV with Web Audio API
-      const audioBuffer = await this.audioContext.decodeAudioData(
-        wavArrayBuffer
-      );
+      const audioBuffer =
+        await this.audioContext.decodeAudioData(wavArrayBuffer);
 
       console.log("Successfully decoded with FFmpeg");
       return audioBuffer;
@@ -174,4 +172,3 @@ export class AudioProcessor {
     return this.audioContext;
   }
 }
-

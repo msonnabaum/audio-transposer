@@ -7,7 +7,10 @@ export interface PitchAnalysisResult {
   semitonesFromC4: number;
 }
 
-export async function analyzePitch(page: Page, audioSelector: string): Promise<PitchAnalysisResult> {
+export async function analyzePitch(
+  page: Page,
+  audioSelector: string
+): Promise<PitchAnalysisResult> {
   return await page.evaluate(async (selector) => {
     const audioElement = document.querySelector(selector) as HTMLAudioElement;
     if (!audioElement) {

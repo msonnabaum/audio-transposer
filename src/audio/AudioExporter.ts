@@ -60,10 +60,13 @@ export class AudioExporter {
         mediaRecorder.start();
 
         // Stop recording after the audio duration
-        setTimeout(() => {
-          mediaRecorder.stop();
-          mediaStream.getTracks().forEach((track) => track.stop());
-        }, (audioBuffer.duration + 0.1) * 1000); // Add small buffer
+        setTimeout(
+          () => {
+            mediaRecorder.stop();
+            mediaStream.getTracks().forEach((track) => track.stop());
+          },
+          (audioBuffer.duration + 0.1) * 1000
+        ); // Add small buffer
       });
     } catch (error) {
       console.error("Error during M4A export:", error);
@@ -143,10 +146,13 @@ export class AudioExporter {
         mediaRecorder.start();
 
         // Stop recording after the audio duration
-        setTimeout(() => {
-          mediaRecorder.stop();
-          mediaStream.getTracks().forEach((track) => track.stop());
-        }, (audioBuffer.duration + 0.1) * 1000); // Add small buffer
+        setTimeout(
+          () => {
+            mediaRecorder.stop();
+            mediaStream.getTracks().forEach((track) => track.stop());
+          },
+          (audioBuffer.duration + 0.1) * 1000
+        ); // Add small buffer
       });
     } catch (error) {
       console.error("Error during MP3 export:", error);
@@ -231,4 +237,3 @@ export class AudioExporter {
     return this.initialized;
   }
 }
-
