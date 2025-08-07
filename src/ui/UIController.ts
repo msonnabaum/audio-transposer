@@ -2,6 +2,8 @@ export class UIController {
   private dropZone: HTMLElement;
   private fileInput: HTMLInputElement;
   private controls: HTMLElement;
+  private fineSlider: HTMLInputElement;
+  private fineSliderValue: HTMLElement;
   private pitchSlider: HTMLInputElement;
   private sliderValue: HTMLElement;
   private previewBtn: HTMLButtonElement;
@@ -24,6 +26,8 @@ export class UIController {
     this.dropZone = document.getElementById("dropZone")!;
     this.fileInput = document.getElementById("fileInput") as HTMLInputElement;
     this.controls = document.getElementById("controls")!;
+    this.fineSlider = document.getElementById("fineSlider") as HTMLInputElement;
+    this.fineSliderValue = document.getElementById("fineSliderValue")!;
     this.pitchSlider = document.getElementById(
       "pitchSlider"
     ) as HTMLInputElement;
@@ -66,6 +70,12 @@ export class UIController {
     this.fileInput.addEventListener(
       "change",
       this.handleFileInputChange.bind(this)
+    );
+
+    // Fine tuning slider
+    this.fineSlider.addEventListener(
+      "input",
+      this.handleFineSliderChange.bind(this)
     );
 
     // Pitch slider
@@ -144,6 +154,16 @@ export class UIController {
     }
   }
 
+  private handleFineSliderChange() {
+    const value = parseInt(this.fineSlider.value, 10);
+    this.fineSliderValue.textContent = value.toString();
+
+    // Reset processed audio when slider changes
+    this.processedAudio.style.display = "none";
+    this.processedAudio.src = "";
+    this.exportBtn.disabled = true;
+  }
+
   private handleSliderChange() {
     const value = parseInt(this.pitchSlider.value, 10);
     this.sliderValue.textContent = value.toString();
@@ -158,13 +178,16 @@ export class UIController {
     if (!this.currentAudioBuffer || !this.onPitchShift) return;
 
     const semitones = parseInt(this.pitchSlider.value, 10);
+    const fineCents = parseInt(this.fineSlider.value, 10);
+    const totalSemitones = semitones + fineCents / 100;
+
     console.log(
-      `UI: Slider value: "${this.pitchSlider.value}", parsed semitones: ${semitones}`
+      `UI: Semitones: ${semitones}, Fine cents: ${fineCents}, Total: ${totalSemitones}`
     );
 
-    // Validate semitones value
-    if (!isFinite(semitones)) {
-      this.setStatus("Error: Invalid pitch value", "error");
+    // Validate values
+    if (!isFinite(semitones) || !isFinite(fineCents)) {
+      this.setStatus("Error: Invalid pitch values", "error");
       return;
     }
 
@@ -175,7 +198,7 @@ export class UIController {
     this.showProgress();
     this.setStatus("Processing audio... This may take a moment.", "processing");
 
-    this.onPitchShift(this.currentAudioBuffer, semitones);
+    this.onPitchShift(this.currentAudioBuffer, totalSemitones);
   }
 
   private handleExport() {

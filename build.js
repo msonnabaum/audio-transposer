@@ -505,6 +505,12 @@ async function build() {
 
         <div class="controls" id="controls">
             <div class="slider-container">
+                <label for="fineSlider">Fine Tuning (cents):</label>
+                <div class="slider-value" id="fineSliderValue">0</div>
+                <input type="range" id="fineSlider" class="slider" min="-50" max="50" value="0" step="1">
+            </div>
+
+            <div class="slider-container">
                 <label for="pitchSlider">Pitch Shift (semitones):</label>
                 <div class="slider-value" id="sliderValue">0</div>
                 <input type="range" id="pitchSlider" class="slider" min="-12" max="12" value="0" step="1">
