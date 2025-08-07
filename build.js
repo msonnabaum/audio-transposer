@@ -616,8 +616,8 @@ async function build() {
         }
       });
 
-      server.listen(3001, () => {
-        console.log("🌐 Server running at http://localhost:3001");
+      server.listen(3010, () => {
+        console.log("🌐 Server running at http://localhost:3010");
       });
     }
   } catch (error) {
