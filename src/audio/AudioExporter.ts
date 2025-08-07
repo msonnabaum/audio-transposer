@@ -31,9 +31,12 @@ export class AudioExporter {
       this.ffmpeg = new FFmpeg();
 
       // Set up logger
-      this.ffmpeg.on("log", ({ type, message }) => {
-        console.log(`[FFmpeg ${type}] ${message}`);
-      });
+      this.ffmpeg.on(
+        "log",
+        ({ type, message }: { type: string; message: string }) => {
+          console.log(`[FFmpeg ${type}] ${message}`);
+        }
+      );
 
       // Load with embedded core (core and worker are embedded in the build)
       await this.ffmpeg.load();
