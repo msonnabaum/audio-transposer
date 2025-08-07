@@ -16,6 +16,7 @@ export class UIController {
 
   private currentAudioBuffer: AudioBuffer | null = null;
   private processedAudioBuffer: AudioBuffer | null = null;
+  private originalFileName: string | null = null;
   private onFileUpload: ((file: File) => void) | null = null;
   private onPitchShift:
     | ((buffer: AudioBuffer, semitones: number) => void)
@@ -149,6 +150,9 @@ export class UIController {
       return;
     }
 
+    // Store the original filename
+    this.originalFileName = file.name;
+
     if (this.onFileUpload) {
       this.onFileUpload(file);
     }
@@ -261,11 +265,38 @@ export class UIController {
     this.status.className = `status ${type}`;
   }
 
-  downloadFile(blob: Blob, filename: string) {
+  private generateExportFilename(): string {
+    if (!this.originalFileName) {
+      return "pitch-shifted-audio.m4a";
+    }
+
+    // Extract base name and extension
+    const lastDot = this.originalFileName.lastIndexOf(".");
+    const baseName =
+      lastDot > 0
+        ? this.originalFileName.substring(0, lastDot)
+        : this.originalFileName;
+
+    // Get current pitch values and calculate total semitones
+    const semitones = parseInt(this.pitchSlider.value, 10);
+    const fineCents = parseInt(this.fineSlider.value, 10);
+    const totalSemitones = semitones + fineCents / 100;
+
+    // Generate suffix
+    let suffix = "";
+    if (totalSemitones !== 0) {
+      const sign = totalSemitones >= 0 ? "+" : "";
+      suffix = `_${sign}${totalSemitones}`;
+    }
+
+    return `${baseName}${suffix}.m4a`;
+  }
+
+  downloadFile(blob: Blob, filename?: string) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = filename;
+    a.download = filename || this.generateExportFilename();
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

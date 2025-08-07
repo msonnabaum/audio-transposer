@@ -66,7 +66,7 @@ class PitchShifterApp {
   private async handleExport(audioBuffer: AudioBuffer) {
     try {
       const m4aBlob = await this.audioExporter.exportToM4A(audioBuffer);
-      this.uiController.downloadFile(m4aBlob, "pitch-shifted-audio.m4a");
+      this.uiController.downloadFile(m4aBlob);
     } catch (error) {
       console.error("Error exporting audio:", error);
       this.uiController.resetLoadingStates();
