@@ -74,21 +74,28 @@ export class PitchShifter {
   async shiftPitch(
     audioBuffer: AudioBuffer,
     semitones: number,
+    tempo: number = 1.0,
     onProgress?: (progress: number) => void
   ): Promise<AudioBuffer> {
     if (!this.initialized || !this.worker || !this.workerReady) {
       throw new Error("Pitch shifter not initialized");
     }
 
-    if (semitones === 0) {
+    if (semitones === 0 && tempo === 1.0) {
       return audioBuffer;
     }
 
     try {
-      console.log(`Shifting pitch by ${semitones} semitones...`);
+      console.log(
+        `Shifting pitch by ${semitones} semitones and tempo to ${tempo}x...`
+      );
 
       if (typeof semitones !== "number" || !isFinite(semitones)) {
         throw new Error(`Invalid semitones value: ${semitones}`);
+      }
+
+      if (typeof tempo !== "number" || !isFinite(tempo) || tempo <= 0) {
+        throw new Error(`Invalid tempo value: ${tempo}`);
       }
 
       const sampleRate = audioBuffer.sampleRate;
@@ -112,6 +119,7 @@ export class PitchShifter {
           sampleRate,
           channels,
           semitones,
+          tempo,
         },
         onProgress
       );
@@ -145,6 +153,7 @@ export class PitchShifter {
       sampleRate: number;
       channels: number;
       semitones: number;
+      tempo?: number;
     },
     onProgress?: (progress: number) => void
   ): Promise<Float32Array[]> {

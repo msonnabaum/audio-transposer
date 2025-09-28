@@ -6,6 +6,8 @@ export class UIController {
   private fineSliderValue: HTMLElement;
   private pitchSlider: HTMLInputElement;
   private sliderValue: HTMLElement;
+  private tempoSlider: HTMLInputElement;
+  private tempoSliderValue: HTMLElement;
   private previewBtn: HTMLButtonElement;
   private exportBtn: HTMLButtonElement;
   private originalAudio: HTMLAudioElement;
@@ -19,7 +21,7 @@ export class UIController {
   private originalFileName: string | null = null;
   private onFileUpload: ((file: File) => void) | null = null;
   private onPitchShift:
-    | ((buffer: AudioBuffer, semitones: number) => void)
+    | ((buffer: AudioBuffer, semitones: number, tempo: number) => void)
     | null = null;
   private onExport: ((buffer: AudioBuffer) => void) | null = null;
 
@@ -33,6 +35,10 @@ export class UIController {
       "pitchSlider"
     ) as HTMLInputElement;
     this.sliderValue = document.getElementById("sliderValue")!;
+    this.tempoSlider = document.getElementById(
+      "tempoSlider"
+    ) as HTMLInputElement;
+    this.tempoSliderValue = document.getElementById("tempoSliderValue")!;
     this.previewBtn = document.getElementById(
       "previewBtn"
     ) as HTMLButtonElement;
@@ -83,6 +89,12 @@ export class UIController {
     this.pitchSlider.addEventListener(
       "input",
       this.handleSliderChange.bind(this)
+    );
+
+    // Tempo slider
+    this.tempoSlider.addEventListener(
+      "input",
+      this.handleTempoSliderChange.bind(this)
     );
 
     // Buttons
@@ -178,20 +190,31 @@ export class UIController {
     this.exportBtn.disabled = true;
   }
 
+  private handleTempoSliderChange() {
+    const value = parseInt(this.tempoSlider.value, 10);
+    this.tempoSliderValue.textContent = value.toString();
+
+    // Reset processed audio when slider changes
+    this.processedAudio.style.display = "none";
+    this.processedAudio.src = "";
+    this.exportBtn.disabled = true;
+  }
+
   private handlePreview() {
     if (!this.currentAudioBuffer || !this.onPitchShift) return;
 
     const semitones = parseInt(this.pitchSlider.value, 10);
     const fineCents = parseInt(this.fineSlider.value, 10);
+    const tempo = parseInt(this.tempoSlider.value, 10) / 100; // Convert percentage to ratio
     const totalSemitones = semitones + fineCents / 100;
 
     console.log(
-      `UI: Semitones: ${semitones}, Fine cents: ${fineCents}, Total: ${totalSemitones}`
+      `UI: Semitones: ${semitones}, Fine cents: ${fineCents}, Total: ${totalSemitones}, Tempo: ${tempo}`
     );
 
     // Validate values
-    if (!isFinite(semitones) || !isFinite(fineCents)) {
-      this.setStatus("Error: Invalid pitch values", "error");
+    if (!isFinite(semitones) || !isFinite(fineCents) || !isFinite(tempo)) {
+      this.setStatus("Error: Invalid parameter values", "error");
       return;
     }
 
@@ -202,7 +225,7 @@ export class UIController {
     this.showProgress();
     this.setStatus("Processing audio... This may take a moment.", "processing");
 
-    this.onPitchShift(this.currentAudioBuffer, totalSemitones);
+    this.onPitchShift(this.currentAudioBuffer, totalSemitones, tempo);
   }
 
   private handleExport() {
@@ -220,7 +243,11 @@ export class UIController {
 
   enableControls(
     audioBuffer: AudioBuffer,
-    onPitchShift: (buffer: AudioBuffer, semitones: number) => void
+    onPitchShift: (
+      buffer: AudioBuffer,
+      semitones: number,
+      tempo: number
+    ) => void
   ) {
     this.currentAudioBuffer = audioBuffer;
     this.onPitchShift = onPitchShift;
@@ -277,16 +304,27 @@ export class UIController {
         ? this.originalFileName.substring(0, lastDot)
         : this.originalFileName;
 
-    // Get current pitch values and calculate total semitones
+    // Get current pitch and tempo values
     const semitones = parseInt(this.pitchSlider.value, 10);
     const fineCents = parseInt(this.fineSlider.value, 10);
+    const tempo = parseInt(this.tempoSlider.value, 10);
     const totalSemitones = semitones + fineCents / 100;
 
     // Generate suffix
     let suffix = "";
+    const parts: string[] = [];
+
     if (totalSemitones !== 0) {
       const sign = totalSemitones >= 0 ? "+" : "";
-      suffix = `_${sign}${totalSemitones}`;
+      parts.push(`${sign}${totalSemitones}st`);
+    }
+
+    if (tempo !== 100) {
+      parts.push(`${tempo}bpm`);
+    }
+
+    if (parts.length > 0) {
+      suffix = `_${parts.join("_")}`;
     }
 
     return `${baseName}${suffix}.m4a`;

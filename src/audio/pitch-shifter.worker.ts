@@ -8,6 +8,7 @@ interface ProcessMessage {
   sampleRate: number;
   channels: number;
   semitones: number;
+  tempo?: number;
 }
 
 interface WorkerResponse {
@@ -140,9 +141,9 @@ class PitchShifterWorker {
       throw new Error("Worker not initialized");
     }
 
-    const { audioData, sampleRate, channels, semitones } = message;
+    const { audioData, sampleRate, channels, semitones, tempo = 1.0 } = message;
 
-    if (semitones === 0) {
+    if (semitones === 0 && tempo === 1.0) {
       this.postMessage({
         type: "complete",
         data: { outputChannels: audioData },
@@ -152,7 +153,7 @@ class PitchShifterWorker {
 
     const inputLength = audioData[0].length;
     const pitchRatio = Math.pow(2, semitones / 12);
-    const timeRatio = 1.0;
+    const timeRatio = 1.0 / tempo; // Inverse of tempo for time stretching
 
     const options = 0x00000010 | 0x00000800 | 0x00000200;
 

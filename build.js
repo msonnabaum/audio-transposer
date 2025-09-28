@@ -488,14 +488,14 @@ async function build() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pitch Shifter Web</title>
+    <title>Audio Transposer Web</title>
     <style>
         ${getCSSContent()}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎵 Pitch Shifter</h1>
+        <h1>🎵 Audio Transposer</h1>
 
         <div class="drop-zone" id="dropZone">
             <p>Drop your audio file here</p>
@@ -514,6 +514,12 @@ async function build() {
                 <label for="pitchSlider">Pitch Shift (semitones):</label>
                 <div class="slider-value" id="sliderValue">0</div>
                 <input type="range" id="pitchSlider" class="slider" min="-12" max="12" value="0" step="1">
+            </div>
+
+            <div class="slider-container">
+                <label for="tempoSlider">Tempo (%):</label>
+                <div class="slider-value" id="tempoSliderValue">100</div>
+                <input type="range" id="tempoSlider" class="slider" min="50" max="200" value="100" step="1">
             </div>
 
             <div class="button-group">
